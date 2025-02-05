@@ -1,10 +1,11 @@
-from flask import Flask,url_for
+from flask import Flask,url_for,render_template
 from markupsafe import escape
 app = Flask(__name__)
 
 @app.route('/')
 def hello():
-    return 'Welcome to My Watchlist!'
+    #return 'Welcome to My Watchlist!'
+    return render_template('index.html',name=name,movies=movies)
 
 @app.route('/user/<name>')
 def user_page(name):
@@ -21,3 +22,10 @@ def test_url_for():
     # 下面这个调用传入了多余的关键字参数，它们会被作为查询字符串附加到 URL 后面。
     print(url_for('test_url_for', num=2))  # 输出：/test?num=2
     return 'Test page'
+#url_for() 是一个 自动生成 URL 的函数，
+#它会根据 视图函数（即 Flask 里的路由处理函数）的名字 生成对应的 URL。
+name = 'Song Aoxiang'
+movies = [
+    ['My Neighbor Totoro', '1988'],
+
+]
