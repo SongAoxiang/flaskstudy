@@ -1,10 +1,12 @@
-from flask import Flask,url_for,render_template
+from flask import Flask, url_for, render_template, redirect, request, flash, get_flashed_messages
 from markupsafe import escape
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+import secrets
 
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = secrets.token_hex(16)
 
 # 配置 MySQL 数据库连接
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:123456@localhost/test_db'
@@ -33,13 +35,25 @@ with app.app_context():
     db.create_all()
 
 
-@app.route('/')
+@app.route('/',methods=['GET', 'POST'])
 def index():
-    name=User.query.first().name
-    movies=Movie.query.all()
-    #return 'Welcome to My Watchlist!'
-    return render_template('index.html',name=name,movies=movies)
+    if request.method == 'POST':  # 判断是否是 POST 请求
+        # 获取表单数据
+        title = request.form.get('title')  # 传入表单对应输入字段的 name 值
+        year = request.form.get('year')
+        # 验证数据
+        if not title or not year or len(year) > 4 or len(title) > 60:
+            flash('Invalid input.')  # 显示错误提示
+            return redirect(url_for('index'))  # 重定向回主页
+        # 保存表单数据到数据库
+        movie = Movie(title=title, year=year)  # 创建记录
+        db.session.add(movie)  # 添加到数据库会话
+        db.session.commit()  # 提交数据库会话
+        flash('Item created.')  # 显示成功创建的提示
+        return redirect(url_for('index'))  # 重定向回主页
 
+    movies = Movie.query.all()
+    return render_template('index.html', movies=movies)
 @app.route('/user/<name>')
 def user_page(name):
     return f'User :{escape(name)}\'s website'
@@ -158,5 +172,39 @@ def page_not_found(e):  # 接受异常对象作为参数
 @app.context_processor#让模板里面都可以用user
 def inject_user():  # 函数名可以随意修改
     user = User.query.first()
+    movies=Movie.query.all()
     return dict(user=user)  # 需要返回字典，等同于 return {'user': user}
+@app.errorhandler(400)
+def bad_request(e):
+    return render_template('400.html')
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('500.html'), 500  # 渲染 500 错误页面
+@app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
+def edit(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
 
+    if request.method == 'POST':  # 处理编辑表单的提交请求
+        title = request.form['title']
+        year = request.form['year']
+
+        if not title or not year or len(year) != 4 or len(title) > 60:
+            flash('Invalid input.')
+            return redirect(url_for('edit', movie_id=movie_id))  # 重定向回对应的编辑页面
+
+        movie.title = title  # 更新标题
+        movie.year = year  # 更新年份
+        db.session.commit()  # 提交数据库会话
+        flash('Item updated.')
+        return redirect(url_for('index'))  # 重定向回主页
+
+    return render_template('edit.html', movie=movie)  # 传入被编辑的电影记录
+
+
+@app.route('/movie/delete/<int:movie_id>', methods=['POST'])  # 限定只接受 POST 请求
+def delete(movie_id):
+    movie = Movie.query.get_or_404(movie_id)  # 获取电影记录
+    db.session.delete(movie)  # 删除对应的记录
+    db.session.commit()  # 提交数据库会话
+    flash('Item deleted.')
+    return redirect(url_for('index'))  # 重定向回主页
