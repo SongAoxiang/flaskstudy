@@ -3,6 +3,9 @@ from markupsafe import escape
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import secrets
+from flask_login import login_user,UserMixin,login_required,current_user
+ 
+
 
 
 app = Flask(__name__)
@@ -14,14 +17,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 初始化 SQLAlchemy
 db = SQLAlchemy(app)
-migrate=Migrate
+migrate = Migrate(app, db)  # 将 migrate 绑定到 app 和 db
 
 
-#定义用户模型
-class User(db.Model):  # 表名将会是 user（自动生成，小写处理）
-    id = db.Column(db.Integer, primary_key=True)  # 主键
-    name = db.Column(db.String(20))  # 名字
-    password = db.Column(db.String(25))
+
 
 
 # 定义电影模型
@@ -38,6 +37,8 @@ with app.app_context():
 @app.route('/',methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':  # 判断是否是 POST 请求
+        if not current_user.is_authenticated:  # 如果当前用户未认证
+            return redirect(url_for('index'))  # 重定向到主页
         # 获取表单数据
         title = request.form.get('title')  # 传入表单对应输入字段的 name 值
         year = request.form.get('year')
@@ -54,6 +55,7 @@ def index():
 
     movies = Movie.query.all()
     return render_template('index.html', movies=movies)
+
 @app.route('/user/<name>')
 def user_page(name):
     return f'User :{escape(name)}\'s website'
@@ -69,118 +71,29 @@ def test_url_for():
     # 下面这个调用传入了多余的关键字参数，它们会被作为查询字符串附加到 URL 后面。
     print(url_for('test_url_for', num=2))  # 输出：/test?num=2
     return 'Test page'
-#url_for() 是一个 自动生成 URL 的函数，
-#它会根据 视图函数（即 Flask 里的路由处理函数）的名字 生成对应的 URL。
-# name = '漫威电影宇宙'
-# movies = [
-#     {'title': '钢铁侠', 'year': '2008'},
-#     {'title': '无敌浩克', 'year': '2008'},
-#     {'title': '钢铁侠2', 'year': '2010'},
-#     {'title': '雷神', 'year': '2011'},
-#     {'title': '美国队长', 'year': '2011'},
-#     {'title': '复仇者联盟', 'year': '2012'},
-#     {'title': '钢铁侠3', 'year': '2013'},
-#     {'title': '雷神2：黑暗世界', 'year': '2013'},
-#     {'title': '美国队长2：冬日战士', 'year': '2014'},
-#     {'title': '银河护卫队', 'year': '2014'},
-#     {'title': '复仇者联盟2：奥创纪元', 'year': '2015'},
-#     {'title': '蚁人', 'year': '2015'},
-#     {'title': '美国队长3：内战', 'year': '2016'},
-#     {'title': '奇异博士', 'year': '2016'},
-#     {'title': '银河护卫队2', 'year': '2017'},
-#     {'title': '蜘蛛侠：英雄归来', 'year': '2017'},
-#     {'title': '雷神3：诸神黄昏', 'year': '2017'},
-#     {'title': '黑豹', 'year': '2018'},
-#     {'title': '复仇者联盟3：无限战争', 'year': '2018'},
-#     {'title': '蚁人2：黄蜂女现身', 'year': '2018'},
-#     {'title': '惊奇队长', 'year': '2019'},
-#     {'title': '复仇者联盟4：终局之战', 'year': '2019'},
-#     {'title': '蜘蛛侠：英雄远征', 'year': '2019'},
-#     {'title': '黑寡妇', 'year': '2021'},
-#     {'title': '尚气与十环传奇', 'year': '2021'},
-#     {'title': '永恒族', 'year': '2021'},
-#     {'title': '蜘蛛侠：英雄无归', 'year': '2021'},
-#     {'title': '奇异博士2：疯狂多元宇宙', 'year': '2022'},
-#     {'title': '雷神4：爱与雷霆', 'year': '2022'},
-#     {'title': '黑豹2：瓦坎达万岁', 'year': '2022'},
-#     {'title': '蚁人3：量子狂热', 'year': '2023'},
-#     {'title': '银河护卫队3', 'year': '2023'},
-#     {'title': '惊奇队长2', 'year': '2023'},
-#     {'title': '死侍与金刚狼', 'year': '2024'},
 
-#     # 索尼漫威角色宇宙
-#     {'title': '毒液', 'year': '2018'},
-#     {'title': '毒液2：屠杀开始', 'year': '2021'},
-#     {'title': '莫比亚斯', 'year': '2022'},
-#     {'title': '猎人克莱文', 'year': '2023'},
-#     {'title': '蜘蛛夫人', 'year': '2023'},
-
-#     # X战警电影宇宙（福克斯）
-#     {'title': 'X战警', 'year': '2000'},
-#     {'title': 'X战警2', 'year': '2003'},
-#     {'title': 'X战警3：背水一战', 'year': '2006'},
-#     {'title': '金刚狼', 'year': '2009'},
-#     {'title': 'X战警：第一战', 'year': '2011'},
-#     {'title': '金刚狼2', 'year': '2013'},
-#     {'title': 'X战警：逆转未来', 'year': '2014'},
-#     {'title': '死侍', 'year': '2016'},
-#     {'title': 'X战警：天启', 'year': '2016'},
-#     {'title': '金刚狼3：殊死一战', 'year': '2017'},
-#     {'title': '死侍2', 'year': '2018'},
-#     {'title': 'X战警：黑凤凰', 'year': '2019'},
-#     {'title': '新变种人', 'year': '2020'}
-# ]
-
-
-
-# import click
-
-
-# @app.cli.command()
-# def forge():
-#     """Generate fake data."""
-#     db.create_all()
-
-#     # 全局的两个变量移动到这个函数内
-#     name = 'Grey Li'
-#     movies = [
-#         {'title': 'My Neighbor Totoro', 'year': '1988'},
-#         {'title': 'Dead Poets Society', 'year': '1989'},
-#         {'title': 'A Perfect World', 'year': '1993'},
-#         {'title': 'Leon', 'year': '1994'},
-#         {'title': 'Mahjong', 'year': '1996'},
-#         {'title': 'Swallowtail Butterfly', 'year': '1996'},
-#         {'title': 'King of Comedy', 'year': '1999'},
-#         {'title': 'Devils on the Doorstep', 'year': '1999'},
-#         {'title': 'WALL-E', 'year': '2008'},
-#         {'title': 'The Pork of Music', 'year': '2012'},
-#     ]
-
-#     user = User(name=name)
-#     db.session.add(user)
-#     for m in movies:
-#         movie = Movie(title=m['title'], year=m['year'])
-#         db.session.add(movie)
-
-#     db.session.commit()
-#     click.echo('Done.')
 @app.errorhandler(404)  # 传入要处理的错误代码
 def page_not_found(e):  # 接受异常对象作为参数
     # user = User.query.first()
     return render_template('404.html')
     # return render_template('404.html', user=user), 404  # 返回模板和状态码
+
 @app.context_processor#让模板里面都可以用user
 def inject_user():  # 函数名可以随意修改
     user = User.query.first()
     movies=Movie.query.all()
     return dict(user=user)  # 需要返回字典，等同于 return {'user': user}
+
 @app.errorhandler(400)
 def bad_request(e):
     return render_template('400.html')
+
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500  # 渲染 500 错误页面
+
 @app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
+@login_required
 def edit(movie_id):
     movie = Movie.query.get_or_404(movie_id)
 
@@ -202,9 +115,123 @@ def edit(movie_id):
 
 
 @app.route('/movie/delete/<int:movie_id>', methods=['POST'])  # 限定只接受 POST 请求
+@login_required
 def delete(movie_id):
     movie = Movie.query.get_or_404(movie_id)  # 获取电影记录
     db.session.delete(movie)  # 删除对应的记录
     db.session.commit()  # 提交数据库会话
     flash('Item deleted.')
     return redirect(url_for('index'))  # 重定向回主页
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    if request.method == 'POST':
+        name = request.form['name']
+
+        if not name or len(name) > 20:
+            flash('Invalid input.')
+            return redirect(url_for('settings'))
+
+        current_user.name = name
+        # current_user 会返回当前登录用户的数据库记录对象
+        # 等同于下面的用法
+        # user = User.query.first()
+        # user.name = name
+        db.session.commit()
+        flash('Settings updated.')
+        return redirect(url_for('index'))
+
+    return render_template('settings.html')
+
+
+from werkzeug.security import generate_password_hash, check_password_hash
+
+
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(20))
+    username = db.Column(db.String(20))  # 用户名
+    password_hash = db.Column(db.String(128))  # 密码散列值
+
+    def set_password(self, password):  # 用来设置密码的方法，接受密码作为参数
+        self.password_hash = generate_password_hash(password)  # 将生成的密码保持到对应字段
+
+    def validate_password(self, password):  # 用于验证密码的方法，接受密码作为参数
+        return check_password_hash(self.password_hash, password)  # 返回布尔值
+
+
+import click
+
+
+@app.cli.command()
+@click.option('--username', prompt=True, help='The username used to login.')
+@click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True, help='The password used to login.')
+def admin(username, password):
+    """Create user."""
+    db.create_all()
+
+    user = User.query.first()
+    if user is not None:
+        click.echo('Updating user...')
+        user.username = username
+        user.set_password(password)  # 设置密码
+    else:
+        click.echo('Creating user...')
+        user = User(username=username, name='Admin')
+        user.set_password(password)  # 设置密码
+        db.session.add(user)
+
+    db.session.commit()  # 提交数据库会话
+    click.echo('Done.')
+
+
+
+from flask_login import LoginManager
+
+login_manager = LoginManager(app)  # 实例化扩展类
+login_manager.login_view = 'login'
+@login_manager.user_loader
+def load_user(user_id):  # 创建用户加载回调函数，接受用户 ID 作为参数
+    user = User.query.get(int(user_id))  # 用 ID 作为 User 模型的主键查询对应的用户
+    return user  # 返回用户对象
+
+
+
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        if not username or not password:
+            flash('Invalid input.')
+            return redirect(url_for('login'))
+
+        user = User.query.first()
+        # 验证用户名和密码是否一致
+        if username == user.username and user.validate_password(password):
+            login_user(user)  # 登入用户
+            flash('Login success.')
+            return redirect(url_for('index'))  # 重定向到主页
+
+        flash('Invalid username or password.')  # 如果验证失败，显示错误消息
+        return redirect(url_for('login'))  # 重定向回登录页面
+
+    return render_template('login.html')
+
+
+
+from flask_login import login_required, logout_user
+
+# ...
+
+@app.route('/logout')
+@login_required  # 用于视图保护，后面会详细介绍
+def logout():
+    logout_user()  # 登出用户
+    flash('Goodbye.')
+    return redirect(url_for('index'))  # 重定向回首页
